@@ -3,8 +3,17 @@ library(Biobase)
 library(GEOquery)
 library(limma)
 
+getwd()
+gene.List <- read.csv(file = "bowenSignals26.csv")
+gene.List <- colnames(gene.List)
+gene.List <- gene.List[-c(1:8)]
+library(stringr)
+
+gene.List <- str_sub(gene.List,start = 2)
 
 
+# get 24 gene panel across all data
+{
 # load series and platform data from GEO
 # 30 ovarian LMP vs 60 ovarian cancer "GSE12172"
 {
@@ -47,14 +56,8 @@ head(tT)
 
 }
 
-getwd()
-gene.List <- read.csv(file = "Misc /bowenSignals26.csv")
-gene.List <- colnames(gene.List)
-gene.List <- gene.List[-c(1:8)]
 
-library(stringr)
 
-gene.List <- str_sub(gene.List,start = 2)
 gene.exp  <- exprs(gset)
 gene.exp <- gene.exp[row.names(gene.exp) %in% gene.List,]
 gene.exp <- rbind(gene.exp,sml)
@@ -336,6 +339,11 @@ tail(gene.exp5,1)
     fit2 <- contrasts.fit(fit, cont.matrix)
     fit2 <- eBayes(fit2, 0.01)
 }
+
+gene.exp6  <- exprs(gset)
+gene.exp6 <- gene.exp6[row.names(gene.exp6) %in% gene.List,]
+gene.exp6 <- rbind(gene.exp6,sml)
+tail(gene.exp6)
 #
 
 #
@@ -385,6 +393,11 @@ tail(gene.exp5,1)
     cont.matrix <- makeContrasts(G1-G0, levels=design)
     fit2 <- contrasts.fit(fit, cont.matrix)
     fit2 <- eBayes(fit2, 0.01)}
+
+gene.exp7  <- exprs(gset)
+gene.exp7 <- gene.exp7[row.names(gene.exp7) %in% gene.List,]
+gene.exp7 <- rbind(gene.exp7,sml)
+tail(gene.exp7)
 #
 #
 #
@@ -427,6 +440,71 @@ tail(gene.exp5,1)
     cont.matrix <- makeContrasts(G1-G0, levels=design)
     fit2 <- contrasts.fit(fit, cont.matrix)
     fit2 <- eBayes(fit2, 0.01)}
+gene.exp8  <- exprs(gset)
+gene.exp8 <- gene.exp8[row.names(gene.exp8) %in% gene.List,]
+gene.exp8 <- rbind(gene.exp8,sml)
+tail(gene.exp)
+
+}
+
+
+# # # # # # On with some analysis
+#           #
+#############
+#           #
+# # # # # # # # # # # # #Data Cleaning
+library(forcats)
+library(dplyr)
+library(magrittr)
+library(caret)
+
+gene.exp.tot <- cbind(gene.exp2,gene.exp3,gene.exp4,gene.exp6,gene.exp7,gene.exp8)
+gene.exp.tot <- t(gene.exp.tot)
+gene.exp.tot <- gene.exp.tot[,-1]
+gene.exp.tot <- rbind(gene.exp.tot,t(gene.exp))
+gene.exp.tot <- as.data.frame(gene.exp.tot)
+sapply(gene.exp.tot,class)
+
+
+gene.exp.tot[,1:25] %<>% mutate_all(.,as.character)%>% mutate_all(.,as.numeric)
+
+gene.exp.tot$sml  %<>% fct_collapse(G0 = c("G0","G2"))
+#filter(., sml == "G2") #%>% mutate(., sml = "G0")
+#gene.exp.tot[which(gene.exp.tot$sml== "G2"),]$sml <- "G0"
+
+glimpse(gene.exp.tot)
+
+validation_index <- createDataPartition(gene.exp.tot$sml, p=0.80, list=FALSE)
+
+train.set   <- gene.exp.tot[validation_index,]
+tests.set   <- gene.exp.tot[-validation_index,]
+
+input.vals  <- train.set[,1:25]
+output.vals <- train.set[,26]
+#gene.exp.tot[,1:25] <- as.numeric((gene.exp.tot[,1:25]))
+
+featurePlot(x= input.vals, y= output.vals, plot = "box")
+plot(train.set)
+library(ggbiplot)
+library(ClusterR)
+
+
+totSignals <- gene.exp.tot[,1:25]
+totType    <- as.factor(gene.exp.tot[,26])
+class(totSignals) <- "numeric"
+tot.pca <- prcomp(totSignals, center = TRUE, scale. = TRUE)
+print(tot.pca)
+
+g <- ggbiplot(tot.pca , obs.scale = 1, var.scale =1 , var.axes = F, groups = totType, ellipse = T)
+#g <- g+ ggbiplot(tot.pca , obs.scale = 1, var.scale =1 , var.axes = F,ellipse.prob = 0.95, groups = totType, ellipse = T)
+#g <-  g+geom_point(aes(shape=as.factor(modTot$cluster) , colour = totType ), size = 3)
+g <- g + scale_color_discrete(name = "Sample Types")
+g <- g+ theme(legend.direction = "vertical", legend.position = "right")
+print(g)
+
+
+
+
 
 ### From GSE 4122, it's in an old machinery
 {# load series and platform data from GEO
